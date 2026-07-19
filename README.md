@@ -30,8 +30,8 @@
 ### 2. 获取本工具
 
 ```powershell
-git clone https://github.com/<your-name>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/thx114/thx114-HSR-Relic-Scorer.git
+cd thx114-HSR-Relic-Scorer
 ```
 
 ### 3. 安装依赖（仅源码运行需要）
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 ### 方式 A：直接使用打包好的 exe（推荐）
 
-下载 [Releases](../../releases) 中的 `崩铁遗器评分.exe`，双击运行（会自动弹出 UAC 提权提示）。
+下载 [Releases](https://github.com/thx114/thx114-HSR-Relic-Scorer/releases) 中的 `崩铁遗器评分.exe`，双击运行（会自动弹出 UAC 提权提示）。
 
 ### 方式 B：源码运行
 
