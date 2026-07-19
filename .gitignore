@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+hsr_relic_config.json
+hsr_relic_scorer.log
+tempCodeRunnerFile.py
