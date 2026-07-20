@@ -1,10 +1,11 @@
 {
   "regions": {
-    "detail": "568,563 | 1916,1057",
-    "relic": "1979,296 | 2510,681"
+    "detail": "583,620 | 1823,1148",
+    "relic": "1980,304 | 2521,664"
   },
   "debug_mode": true,
-  "current_character": "遐蝶",
+  "overlay_scale": 1.1951219512195124,
+  "current_character": "大黑塔",
   "characters": {
     "姬子": {
       "name": "姬子",
@@ -56,35 +57,35 @@
           "subs": [
             {
               "name": "攻击力%",
-              "value": 3.8,
+              "value": 3.4,
               "percent": true,
-              "score": 0.9866109992436827,
+              "score": 0.8836749397604884,
+              "delta": 0.0
+            },
+            {
+              "name": "防御力%",
+              "value": 20.5,
+              "percent": true,
+              "score": 0.0,
               "delta": 0.0
             },
             {
               "name": "暴击率",
-              "value": 13.6,
+              "value": 8.1,
               "percent": true,
-              "score": 11.210121097751193,
+              "score": 7.016068458275794,
               "delta": 0.0
             },
             {
-              "name": "效果命中",
-              "value": 3.8,
+              "name": "暴击伤害",
+              "value": 6.4,
               "percent": true,
-              "score": 0.0,
-              "delta": 0.0
-            },
-            {
-              "name": "击破特攻",
-              "value": 5.1,
-              "percent": true,
-              "score": 0.0,
+              "score": 1.2110424996921978,
               "delta": 0.0
             }
           ],
-          "raw_text": "头部\n+15\n生命值\n705\n3.8%\n攻击力\n13.6%\n暴击率\n3.8%\n效果命中\n5.1%\n击破特攻",
-          "total_score": 12.196732096994875,
+          "raw_text": "头部\n+15\n生命值\n705\n3.4%\n攻击力\n防御力\n20.5%\n8.1%\n暴击率\n6.4%\n暴击伤害",
+          "total_score": 9.11078589772848,
           "total_delta": 0.0
         },
         "手部": {
@@ -110,19 +111,19 @@
               "name": "攻击力%",
               "value": 22.8,
               "percent": true,
-              "score": 5.919665995462096,
+              "score": 5.925820184276147,
               "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 5.8,
               "percent": true,
-              "score": 1.124278061885007,
+              "score": 1.097507265346047,
               "delta": 0.0
             }
           ],
-          "raw_text": "手部\n+15\n攻击力\n352\n42\n生命值\n3.8%\n生命值\n攻击力\n22.8% 5\n5.8%\n暴击伤害",
-          "total_score": 7.043944057347103,
+          "raw_text": "手部\n+15\n攻击力\n352\n-42\n生命值\n3.8%\n生命值\n22.8%\n攻击力\n5.8%\n暴击伤害",
+          "total_score": 7.023327449622194,
           "total_delta": 0.0
         },
         "躯干": {
@@ -141,7 +142,7 @@
               "name": "暴击伤害",
               "value": 22.6,
               "percent": true,
-              "score": 4.380807620448423,
+              "score": 4.276493827038064,
               "delta": 0.0
             },
             {
@@ -160,7 +161,7 @@
             }
           ],
           "raw_text": "躯干\n+15\n暴击率\n32.4%\n-19\n防御力\n22.6%\n暴击伤害\n11.6%\n击破特攻\n3.4%\n效果抵抗",
-          "total_score": 4.380807620448423,
+          "total_score": 4.276493827038064,
           "total_delta": 0.0
         },
         "脚部": {
@@ -179,14 +180,14 @@
               "name": "暴击率",
               "value": 8.7,
               "percent": true,
-              "score": 7.1711804081202315,
+              "score": 7.535777232962886,
               "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 18.1,
               "percent": true,
-              "score": 3.5085229172617938,
+              "score": 3.424979569441981,
               "delta": 0.0
             },
             {
@@ -198,7 +199,7 @@
             }
           ],
           "raw_text": "脚部\n+15\n43.2%\n攻击力\n4.8%\n防御力\n8.7%\n暴击率\n18.1%\n暴击伤害\n4.3%\n效果命中",
-          "total_score": 10.679703325382025,
+          "total_score": 10.960756802404866,
           "total_delta": 0.0
         },
         "位面球": {
@@ -210,14 +211,14 @@
               "name": "暴击率",
               "value": 8.4,
               "percent": true,
-              "score": 6.923898325081604,
+              "score": 7.275922845619333,
               "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 10.3,
               "percent": true,
-              "score": 1.9965627650716362,
+              "score": 1.9490215229421162,
               "delta": 0.0
             },
             {
@@ -231,12 +232,12 @@
               "name": "攻击力",
               "value": 38.0,
               "percent": false,
-              "score": 0.709281811102575,
+              "score": 0.710019192939868,
               "delta": 0.0
             }
           ],
           "raw_text": "位面球\n+15\n攻击力\n43.2%\n8.4% (2\n暴击率\n10.3%\n暴击伤害\n6.4%\n击破特攻\n38\n攻击力",
-          "total_score": 9.629742901255815,
+          "total_score": 9.934963561501318,
           "total_delta": 0.0
         },
         "连结绳": {
@@ -248,7 +249,7 @@
               "name": "攻击力",
               "value": 55.0,
               "percent": false,
-              "score": 1.026592095016889,
+              "score": 1.0276593582024303,
               "delta": 0.0
             },
             {
@@ -262,19 +263,19 @@
               "name": "暴击率",
               "value": 9.0,
               "percent": true,
-              "score": 7.418462491158858,
+              "score": 7.795631620306439,
               "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 12.9,
               "percent": true,
-              "score": 2.500549482468351,
+              "score": 2.441007538442071,
               "delta": 0.0
             }
           ],
           "raw_text": "连结绳\n+15\n攻击力\n43.2%\n55②\n攻击力\n3.4%\n生命值\n9.0%\n暴击率\n12.9%\n暴击伤害",
-          "total_score": 10.945604068644098,
+          "total_score": 11.26429851695094,
           "total_delta": 0.0
         }
       }
@@ -609,26 +610,26 @@
               "value": 7.7,
               "percent": true,
               "score": 1.8243911206974102,
-              "delta": 5.10702591327572e-15
+              "delta": 0.0
             },
             {
               "name": "暴击率",
               "value": 5.5,
               "percent": true,
               "score": 4.159563218886895,
-              "delta": -0.1839563789342229
+              "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 12.3,
               "percent": true,
               "score": 3.0102760486454456,
-              "delta": 0.0432542250330048
+              "delta": 0.0
             }
           ],
           "raw_text": "头部\nm\n+15\n生命值\n705\n7.7% (T\n生命值\n速度\n5.5%\n暴击率\n12.3%\n暴击伤害",
           "total_score": 8.99423038822975,
-          "total_delta": -0.14070215390121277
+          "total_delta": 0.0
         },
         "手部": {
           "slot": "手部",
@@ -640,21 +641,21 @@
               "value": 7.3,
               "percent": true,
               "score": 1.729617555985853,
-              "delta": 4.884981308350689e-15
+              "delta": 0.0
             },
             {
               "name": "暴击率",
               "value": 11.6,
               "percent": true,
               "score": 8.772896970743282,
-              "delta": 4.0345119549384165
+              "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 11.0,
               "percent": true,
               "score": 2.6921167914715354,
-              "delta": 0.03868264027342638
+              "delta": 0.0
             },
             {
               "name": "效果抵抗",
@@ -666,7 +667,7 @@
           ],
           "raw_text": "手部\n+15\n攻击力\n352\n7.3% (T\n生命值\n11.6%\n暴击率\n11.0%\n暴击伤害\n4.3%\n效果抵抗",
           "total_score": 13.19463131820067,
-          "total_delta": 4.073194595211847
+          "total_delta": 0.0
         },
         "躯干": {
           "slot": "躯干",
@@ -678,14 +679,14 @@
               "value": 7.7,
               "percent": true,
               "score": 1.8243911206974102,
-              "delta": 5.10702591327572e-15
+              "delta": 0.0
             },
             {
               "name": "暴击率",
               "value": 7.7,
               "percent": true,
               "score": 5.823388506441655,
-              "delta": -0.2575389305079119
+              "delta": 0.0
             },
             {
               "name": "效果抵抗",
@@ -704,7 +705,7 @@
           ],
           "raw_text": "躯干\n+15\n64.8%\n暴击伤害\n7.7% (1\n生命值\n暴击率\n7.7%\n8.2%\n效果抵抗\n击破特攻\n11.6%",
           "total_score": 7.647779627139066,
-          "total_delta": -0.25753893050790655
+          "total_delta": 0.0
         },
         "脚部": {
           "slot": "脚部",
@@ -716,21 +717,21 @@
               "value": 80.0,
               "percent": false,
               "score": 0.6536107911141522,
-              "delta": -3.6637359812630166e-15
+              "delta": 0.0
             },
             {
               "name": "暴击率",
               "value": 8.7,
               "percent": true,
               "score": 6.579672728057447,
-              "delta": -0.2909855448595886
+              "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 18.7,
               "percent": true,
               "score": 4.5765985455016125,
-              "delta": 0.06576048846481175
+              "delta": 0.0
             },
             {
               "name": "效果命中",
@@ -742,7 +743,7 @@
           ],
           "raw_text": "脚部\n+15\n生命值\n43.2%\n80\n生命值\n暴击率\n8.7%\n18.7%\n暴击伤害\n3.8%\n效果命中",
           "total_score": 11.80988206467321,
-          "total_delta": -0.2252250563947804
+          "total_delta": 0.0
         },
         "位面球": {
           "slot": "位面球",
@@ -761,14 +762,14 @@
               "value": 2.5,
               "percent": true,
               "score": 1.890710554039507,
-              "delta": -0.08361653587917695
+              "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 17.4,
               "percent": true,
               "score": 4.2584392883277165,
-              "delta": 0.061188903705232
+              "delta": 0.0
             },
             {
               "name": "击破特攻",
@@ -780,7 +781,7 @@
           ],
           "raw_text": "位面球\n+15\n生命值\n43.2%\n9.1% (\n防御力\n2.5%\n暴击率\n17.4%\n暴击伤害\n11.0%\n击破特攻",
           "total_score": 6.1491498423672235,
-          "total_delta": -0.022427632173944723
+          "total_delta": 0.0
         },
         "连结绳": {
           "slot": "连结绳",
@@ -799,14 +800,14 @@
               "value": 8.1,
               "percent": true,
               "score": 6.125902195087969,
-              "delta": -0.27091757624858204
+              "delta": 0.0
             },
             {
               "name": "暴击伤害",
               "value": 12.9,
               "percent": true,
               "score": 3.157118782725716,
-              "delta": 0.04536418722974345
+              "delta": 0.0
             },
             {
               "name": "击破特攻",
@@ -818,7 +819,552 @@
           ],
           "raw_text": "连结绳\n+15\n生命值\n43.2%\n5.4%\n防御力\n暴击率\n8.1%\n12.9%\n暴击伤害\n11.0% (1\n击破特攻",
           "total_score": 9.283020977813685,
-          "total_delta": -0.22555338901883815
+          "total_delta": 0.0
+        }
+      }
+    },
+    "白厄": {
+      "name": "白厄",
+      "valid_subs": [
+        "攻击力",
+        "攻击力%",
+        "暴击率",
+        "暴击伤害",
+        "属性加伤"
+      ],
+      "conversion_formulas": [],
+      "damage_source": "ATK",
+      "damage_formula": "ATK",
+      "ally_buffs": {
+        "atk": "961",
+        "atk_pct": "0",
+        "crit_rate": "10+16",
+        "crit_dmg": "51+72+36+30",
+        "hp": "0",
+        "hp_pct": "0",
+        "break_dmg": "0"
+      },
+      "self_buffs": {
+        "atk": "0",
+        "atk_pct": "50+80+48",
+        "crit_rate": "0",
+        "crit_dmg": "30+16",
+        "hp": "0",
+        "hp_pct": "0",
+        "break_dmg": "0"
+      },
+      "base_stats": {
+        "hp_base": 2388.0,
+        "hp_bonus": 0.0,
+        "atk_base": 1270.0,
+        "atk_bonus": 0.0,
+        "def_base": 1100.0,
+        "def_bonus": 0.0,
+        "speed": 106.0,
+        "crit_rate": 0.17,
+        "crit_dmg": 0.873
+      },
+      "relics": {
+        "头部": {
+          "slot": "头部",
+          "main_name": "生命值",
+          "main_value": 705.0,
+          "subs": [
+            {
+              "name": "防御力",
+              "value": 19.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 8.1,
+              "percent": true,
+              "score": 1.6894428152492609,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 24.6,
+              "percent": true,
+              "score": 4.80938416422286,
+              "delta": 0.0
+            },
+            {
+              "name": "效果抵抗",
+              "value": 3.8,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "头部\n+15\n生命值\n705\n-19\n防御力\n暴击率\n8.1%\n24.6%\n暴击伤害\n3.8%\n效果抵抗",
+          "total_score": 6.4988269794721205,
+          "total_delta": 0.0
+        },
+        "手部": {
+          "slot": "手部",
+          "main_name": "攻击力",
+          "main_value": 352.0,
+          "subs": [
+            {
+              "name": "攻击力%",
+              "value": 12.0,
+              "percent": true,
+              "score": 2.4358277658792256,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 5.5,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 5.8,
+              "percent": true,
+              "score": 1.1339198435972613,
+              "delta": 0.0
+            },
+            {
+              "name": "击破特攻",
+              "value": 11.6,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "手部\n+15\n攻击力\n352\n12.0%\n攻击力\n暴击率\n5.5%\n5.8%\n暴击伤害\n11.6% (1\n击破特攻",
+          "total_score": 3.5697476094764866,
+          "total_delta": 0.0
+        },
+        "躯干": {
+          "slot": "躯干",
+          "main_name": "暴击率",
+          "main_value": 32.4,
+          "subs": [
+            {
+              "name": "生命值%",
+              "value": 8.2,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "防御力%",
+              "value": 10.8,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 18.1,
+              "percent": true,
+              "score": 3.5386119257086963,
+              "delta": 0.0
+            },
+            {
+              "name": "效果抵抗",
+              "value": 3.8,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "躯干\n+15\n暴击率\n32.4%\n生命值\n8.2%\n10.8%\n防御力\n18.1%\n暴击伤害\n3.8%\n效果抵抗",
+          "total_score": 3.5386119257086963,
+          "total_delta": 0.0
+        },
+        "脚部": {
+          "slot": "脚部",
+          "main_name": "攻击力%",
+          "main_value": 43.2,
+          "subs": [
+            {
+              "name": "防御力",
+              "value": 16.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 2.9,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 18.1,
+              "percent": true,
+              "score": 3.5386119257086963,
+              "delta": 0.0
+            },
+            {
+              "name": "效果抵抗",
+              "value": 10.8,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "脚部\n+15\n攻击力\n43.2%\n16\n防御力\n2.9%\n暴击率\n18.1%\n暴击伤害\n效果抵抗\n10.8%",
+          "total_score": 3.5386119257086963,
+          "total_delta": 0.0
+        },
+        "位面球": {
+          "slot": "位面球",
+          "main_name": "属性加伤",
+          "main_value": 38.8,
+          "subs": [
+            {
+              "name": "攻击力",
+              "value": 16.0,
+              "percent": false,
+              "score": 0.2557299491736731,
+              "delta": 0.0
+            },
+            {
+              "name": "攻击力%",
+              "value": 11.6,
+              "percent": true,
+              "score": 2.354633507016565,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 9.0,
+              "percent": true,
+              "score": 2.413489736070384,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 11.6,
+              "percent": true,
+              "score": 2.2678396871945226,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "位面球\n+15\n38.8%\n物理属性伤害提高\n滋\n-16\n攻击力\n1.1.6%\n攻击力\n9.0%\n暴击率\n11.6% (1\n暴击伤害",
+          "total_score": 7.2916928794551445,
+          "total_delta": 0.0
+        },
+        "连结绳": {
+          "slot": "连结绳",
+          "main_name": "攻击力%",
+          "main_value": 43.2,
+          "subs": [
+            {
+              "name": "速度",
+              "value": 72.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 5.1,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 11.0,
+              "percent": true,
+              "score": 2.150537634408587,
+              "delta": 0.0
+            },
+            {
+              "name": "击破特攻",
+              "value": 5.1,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "连结绳\n+15\n攻击力\n43.2%\n72\n速度\n5.1%(\n暴击率\n11.0%\n暴击伤害\n5.1%\n击破特攻",
+          "total_score": 2.150537634408587,
+          "total_delta": 0.0
+        }
+      }
+    },
+    "大黑塔": {
+      "name": "大黑塔",
+      "valid_subs": [
+        "攻击力",
+        "攻击力%",
+        "速度",
+        "暴击率",
+        "暴击伤害",
+        "属性加伤"
+      ],
+      "conversion_formulas": [],
+      "damage_source": "ATK",
+      "damage_formula": "ATK",
+      "ally_buffs": {
+        "atk": "0",
+        "atk_pct": "40",
+        "crit_rate": "4",
+        "crit_dmg": "72(刻律)+40(花)",
+        "hp": "0",
+        "hp_pct": "0",
+        "break_dmg": "0"
+      },
+      "self_buffs": {
+        "atk": "0",
+        "atk_pct": "44",
+        "crit_rate": "0",
+        "crit_dmg": "400",
+        "hp": "0",
+        "hp_pct": "0",
+        "break_dmg": "0"
+      },
+      "base_stats": {
+        "hp_base": 2116.0,
+        "hp_bonus": 0.0,
+        "atk_base": 1314.0,
+        "atk_bonus": 236.0,
+        "def_base": 948.0,
+        "def_bonus": 0.0,
+        "speed": 99.0,
+        "crit_rate": 0.17,
+        "crit_dmg": 0.5
+      },
+      "relics": {
+        "头部": {
+          "slot": "头部",
+          "main_name": "生命值",
+          "main_value": 705.0,
+          "subs": [
+            {
+              "name": "攻击力%",
+              "value": 3.4,
+              "percent": true,
+              "score": 1.1600341290370337,
+              "delta": 0.13592178018047862
+            },
+            {
+              "name": "防御力%",
+              "value": 20.5,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 8.1,
+              "percent": true,
+              "score": 9.0628028079666,
+              "delta": 0.2154881108241522
+            },
+            {
+              "name": "暴击伤害",
+              "value": 6.4,
+              "percent": true,
+              "score": 0.8231496908308883,
+              "delta": 0.009585127805288751
+            }
+          ],
+          "raw_text": "头部\n+15\n生命值\n705\n3.4%\n攻击力\n防御力\n20.5%\n8.1%\n暴击率\n6.4%\n暴击伤害",
+          "total_score": 11.045986627834521,
+          "total_delta": 0.3609950188099198
+        },
+        "手部": {
+          "slot": "手部",
+          "main_name": "攻击力",
+          "main_value": 352.0,
+          "subs": [
+            {
+              "name": "防御力",
+              "value": 16.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "攻击力%",
+              "value": 7.7,
+              "percent": true,
+              "score": 2.6271361157603748,
+              "delta": 0.30782285511465624
+            },
+            {
+              "name": "速度",
+              "value": 2.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 24.6,
+              "percent": true,
+              "score": 3.163981624131238,
+              "delta": 0.03684283500160612
+            }
+          ],
+          "raw_text": "手部\n+15\n攻击力\n352\n-16\n防御力\n7.7%(1\n攻击力\n速度\n2\n24.6%\n暴击伤害",
+          "total_score": 5.791117739891613,
+          "total_delta": 0.3446656901162619
+        },
+        "躯干": {
+          "slot": "躯干",
+          "main_name": "暴击率",
+          "main_value": 32.4,
+          "subs": [
+            {
+              "name": "生命值%",
+              "value": 12.5,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "攻击力%",
+              "value": 4.3,
+              "percent": true,
+              "score": 1.4671019867233248,
+              "delta": 0.17190107493414764
+            },
+            {
+              "name": "暴击伤害",
+              "value": 17.4,
+              "percent": true,
+              "score": 2.2379382219464845,
+              "delta": 0.026059566220648644
+            },
+            {
+              "name": "击破特攻",
+              "value": 5.1,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "躯干\n+15\n32.4%\n暴击率\n12.5%\n生命值\n4.3%\n攻击力\n17.4%\n暴击伤害\n5.1%\n击破特攻",
+          "total_score": 3.7050402086698093,
+          "total_delta": 0.1979606411547965
+        },
+        "脚部": {
+          "slot": "脚部",
+          "main_name": "速度",
+          "main_value": 25.0,
+          "subs": [
+            {
+              "name": "攻击力%",
+              "value": 4.3,
+              "percent": true,
+              "score": 1.4671019867233248,
+              "delta": 1.4671019867233248
+            },
+            {
+              "name": "防御力%",
+              "value": 10.2,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击伤害",
+              "value": 10.3,
+              "percent": true,
+              "score": 1.3247565336809561,
+              "delta": -1.7133986313677574
+            },
+            {
+              "name": "击破特攻",
+              "value": 18.1,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "脚部\n+15\n速度\n25\n4.3%\n攻击力\n10.2%(1\n防御力\n10.3% (\n暴击伤害\n18.1%\n击破特攻",
+          "total_score": 2.791858520404281,
+          "total_delta": -2.9769493289476605
+        },
+        "位面球": {
+          "slot": "位面球",
+          "main_name": "属性加伤",
+          "main_value": 38.8,
+          "subs": [
+            {
+              "name": "防御力",
+              "value": 16.0,
+              "percent": false,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "暴击率",
+              "value": 12.3,
+              "percent": true,
+              "score": 13.76203389357892,
+              "delta": 0.32722268680704936
+            },
+            {
+              "name": "暴击伤害",
+              "value": 11.0,
+              "percent": true,
+              "score": 1.4147885311155963,
+              "delta": 0.016474438415359893
+            },
+            {
+              "name": "效果抵抗",
+              "value": 7.7,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "位面球\n+15\n滋:冰属性伤害提高\n38.8%\n-16\n防御力\n暴击率\n12.3%\n11.0%\n暴击伤害\n7.7%\n效果抵抗",
+          "total_score": 15.176822424694516,
+          "total_delta": 0.34369712522240903
+        },
+        "连结绳": {
+          "slot": "连结绳",
+          "main_name": "攻击力%",
+          "main_value": 43.2,
+          "subs": [
+            {
+              "name": "攻击力",
+              "value": 19.0,
+              "percent": false,
+              "score": 0.49334426653470115,
+              "delta": 0.0578053949196371
+            },
+            {
+              "name": "暴击伤害",
+              "value": 10.3,
+              "percent": true,
+              "score": 1.3247565336809561,
+              "delta": 0.015426065061652228
+            },
+            {
+              "name": "效果命中",
+              "value": 11.6,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            },
+            {
+              "name": "击破特攻",
+              "value": 11.0,
+              "percent": true,
+              "score": 0.0,
+              "delta": 0.0
+            }
+          ],
+          "raw_text": "连结绳\n+15\n43.2%\n攻击力\n-19\n攻击力\n10.3%(\n暴击伤害\n效果命中\n11.6%\n11.0%\n击破特攻",
+          "total_score": 1.8181008002156573,
+          "total_delta": 0.07323145998128933
         }
       }
     }

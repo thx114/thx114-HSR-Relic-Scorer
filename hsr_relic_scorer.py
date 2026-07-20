@@ -228,6 +228,13 @@ def log_to_file(msg: str, level: str = "INFO") -> None:
         pass
 
 
+def scaled_font(base_size: int, scale: float, bold: bool = False) -> tuple:
+    """根据缩放系数生成 overlay 字体规格。
+    独立于 Windows DPI 缩放，让 overlay 字体在高分辨率下保持合适大小。"""
+    actual = max(6, int(round(base_size * scale)))
+    return ("Microsoft YaHei UI", actual, "bold") if bold else ("Microsoft YaHei UI", actual)
+
+
 def is_admin() -> bool:
     if sys.platform != "win32":
         return True
@@ -313,6 +320,7 @@ class StatLine:
     score: float = 0.0
     delta: float = 0.0
     theoretical_score: float = 0.0  # 暴击率超100%时的理论分
+    weight: float = 0.0  # 词条权重，>0 表示有效词条（即使 score=0 也显示）
 
 
 @dataclass
@@ -320,6 +328,7 @@ class Relic:
     slot: str
     main_name: str | None = None
     main_value: float = 0.0
+    main_box: list | None = None  # 主词条 OCR box，用于 debug 对齐
     subs: list[StatLine] = field(default_factory=list)
     raw_text: str = ""
     total_score: float = 0.0
@@ -511,16 +520,29 @@ def character_stats_from_dict(data: dict) -> CharacterStats:
 
 
 def parse_plus_expr(text: str) -> float:
-    clean = text.strip().replace("％", "%").replace("，", ",")
-    if not clean:
+    """解析拐力输入。允许输入中文/符号作为注释，仅累加其中的数字部分。
+
+    支持格式：
+      "100+200"           -> 300
+      "100（鸟）+200（停云）" -> 300
+      "攻击力 100"         -> 100
+      "5.5% 暴击"          -> 5.5
+      "无"                -> 0
+    百分号会被剥离，不参与数值（与原逻辑一致）。
+    """
+    if not text:
         return 0.0
+    clean = text.strip().replace("％", "%").replace("，", ",")
     clean = clean.replace("%", "")
     total = 0.0
     for part in clean.split("+"):
         part = part.strip()
         if not part:
             continue
-        total += float(part)
+        # 提取第一个数字（支持小数和负号），其余字符作为注释忽略
+        m = re.search(r"-?\d+(?:\.\d+)?", part)
+        if m:
+            total += float(m.group())
     return total
 
 
@@ -542,11 +564,19 @@ def pct_to_ratio(value: float) -> float:
 class UmiOcrClient:
     def __init__(self, url: str = OCR_URL):
         self.url = url
+        # 屏蔽区域（相对图片坐标），用于屏蔽强化标记①②等，格式 [[x1,y1],[x2,y2]]
+        self.ignore_area: list | None = None
 
     def image_to_lines(self, image: Image.Image) -> list[dict]:
         buf = io.BytesIO()
         image.save(buf, format="PNG")
-        payload = {"base64": base64.b64encode(buf.getvalue()).decode("ascii")}
+        payload = {
+            "base64": base64.b64encode(buf.getvalue()).decode("ascii"),
+            # 提高大图识别精度：不压缩边长，保留更多像素细节
+            "ocr.limit_side_len": 4320,
+        }
+        if self.ignore_area:
+            payload["tbpu.ignoreArea"] = [self.ignore_area]
         response = requests.post(self.url, json=payload, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -633,6 +663,65 @@ def flatten_ocr_text(lines: list[dict]) -> str:
     return "\n".join(str(item.get("text", "")) for item in lines if item.get("text"))
 
 
+def _find_percent_after(text: str, keyword: str, next_keywords: list[str] | None = None) -> float | None:
+    """在 text 中找 keyword 之后、下一个词条名之前的第一个百分比数字。
+    next_keywords 指定可能紧跟在 keyword 后的词条名，用于限定搜索范围，避免越过下一个词条。"""
+    pos = text.find(keyword)
+    if pos < 0:
+        return None
+    start = pos + len(keyword)
+    # 限定搜索范围：找到下一个词条名的位置
+    end = len(text)
+    if next_keywords:
+        nk_pos = len(text)
+        for nk in next_keywords:
+            p = text.find(nk, start)
+            if 0 <= p < nk_pos:
+                nk_pos = p
+        if nk_pos < end:
+            end = nk_pos
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%", text[start:end])
+    if not m:
+        return None
+    return float(m.group(1))
+
+
+def _find_flat_after(text: str, keyword: str, next_keywords: list[str] | None = None) -> tuple[float, float | None] | None:
+    """在 text 中找 keyword 之后、下一个词条名之前的数值。
+    返回 (base_value, bonus_value_or_None)。next_keywords 用于限定搜索范围。"""
+    pos = text.find(keyword)
+    if pos < 0:
+        return None
+    start = pos + len(keyword)
+    end = len(text)
+    if next_keywords:
+        nk_pos = len(text)
+        for nk in next_keywords:
+            p = text.find(nk, start)
+            if 0 <= p < nk_pos:
+                nk_pos = p
+        if nk_pos < end:
+            end = nk_pos
+    after = text[start:end]
+    matches = list(re.finditer(r"([+＋]?)(\d+(?:\.\d+)?)", after))
+    if not matches:
+        return None
+    base_val = None
+    bonus_val = None
+    for m in matches:
+        is_plus = bool(m.group(1))
+        val = float(m.group(2))
+        if not is_plus and base_val is None:
+            base_val = val
+        elif is_plus and base_val is not None and bonus_val is None:
+            bonus_val = val
+        if base_val is not None and bonus_val is not None:
+            break
+    if base_val is None:
+        return None
+    return (base_val, bonus_val)
+
+
 def parse_detail_stats(text: str) -> CharacterStats:
     matches = list(re.finditer(r"[+＋]?\d+(?:\.\d+)?%?", text))
     nums = []
@@ -647,6 +736,28 @@ def parse_detail_stats(text: str) -> CharacterStats:
             }
         )
     stats = CharacterStats()
+
+    # 优先用词条名定位（抗 OCR 漏行/多行），失败则回退到原有顺序解析
+    # next_keywords 指定每个属性后可能紧跟的下一个属性名，用于限定搜索范围
+    hp_res = _find_flat_after(text, "生命值", ["攻击力", "防御力", "速度", "暴击率", "暴击伤害"])
+    atk_res = _find_flat_after(text, "攻击力", ["防御力", "速度", "暴击率", "暴击伤害"])
+    def_res = _find_flat_after(text, "防御力", ["速度", "暴击率", "暴击伤害"])
+    spd_res = _find_flat_after(text, "速度", ["暴击率", "暴击伤害", "击破特攻", "进阶属性"])
+    crit_rate_val = _find_percent_after(text, "暴击率", ["暴击伤害", "击破特攻"])
+    crit_dmg_val = _find_percent_after(text, "暴击伤害", ["击破特攻"])
+
+    used_name_based = (hp_res and atk_res and def_res and spd_res
+                       and crit_rate_val is not None and crit_dmg_val is not None)
+    if used_name_based:
+        stats.hp_base, stats.hp_bonus = hp_res[0], (hp_res[1] or 0.0)
+        stats.atk_base, stats.atk_bonus = atk_res[0], (atk_res[1] or 0.0)
+        stats.def_base, stats.def_bonus = def_res[0], (def_res[1] or 0.0)
+        stats.speed = spd_res[0]
+        stats.crit_rate = pct_to_ratio(crit_rate_val)
+        stats.crit_dmg = pct_to_ratio(crit_dmg_val)
+        return stats
+
+    # 回退：原有顺序解析
     percent_nums = [item for item in nums if item["percent"]]
     flat_nums = [item for item in nums if not item["percent"]]
     if len(flat_nums) >= 4 and len(percent_nums) >= 2:
@@ -678,6 +789,30 @@ def parse_detail_stats(text: str) -> CharacterStats:
     return stats
 
 
+def detect_enhance_marker_by_color(image) -> list | None:
+    """通过颜色 #6EE0B6 检测强化标记①②等在图片中的位置，
+    返回相对图片的屏蔽区域 [[x1,y1],[x2,y2]]。所有遗器强化标记位置固定，首次检测后可复用。"""
+    if Image is None or np is None:
+        return None
+    try:
+        arr = np.array(image.convert("RGB"))
+        # 目标颜色 #6EE0B6 = (110, 224, 182)
+        target = np.array([110, 224, 182])
+        # 允许一定容差，匹配相近的绿色
+        diff = np.abs(arr.astype(int) - target).sum(axis=2)
+        mask = diff < 30  # 总差值小于30视为匹配
+        ys, xs = np.where(mask)
+        if len(xs) == 0:
+            return None
+        x1, x2 = int(xs.min()), int(xs.max())
+        y1, y2 = int(ys.min()), int(ys.max())
+        # 外扩 8px，覆盖标记数字本身（数字可能不是纯绿色）
+        return [[max(0, x1 - 8), max(0, y1 - 8)], [x2 + 8, y2 + 8]]
+    except Exception as exc:
+        log_to_file(f"detect_enhance_marker_by_color failed: {exc}", "ERROR")
+        return None
+
+
 def parse_relic(lines: list[dict]) -> Relic:
     text = flatten_ocr_text(lines)
     compact = text.replace(" ", "")
@@ -693,6 +828,22 @@ def parse_relic(lines: list[dict]) -> Relic:
         circled_digits = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫"
         for c in circled_digits:
             line_text = line_text.replace(c, "")
+        # OCR 偶尔把 "11" 识成 "1.1"，导致 "11.6%" 变成 "1.1.6%"。
+        # 检测多小数点异常（X.Y.Z%），去掉第一个小数点拼成 XY.Z%。
+        # 仅当拼接后的数值在遗器副词条合理范围内才修正。
+        m_multi_dot = re.search(r"(\d+)\.(\d+)\.(\d+)%?", line_text)
+        if m_multi_dot:
+            merged = f"{m_multi_dot.group(1)}{m_multi_dot.group(2)}.{m_multi_dot.group(3)}"
+            if m_multi_dot.group(0).endswith("%"):
+                merged += "%"
+            try:
+                merged_val = float(merged.replace("%", ""))
+                # 副词条百分比合理范围 1.0~40.0
+                if 1.0 <= merged_val <= 40.0:
+                    line_text = line_text[:m_multi_dot.start()] + merged + line_text[m_multi_dot.end():]
+                    log_to_file(f"parse_relic: fixed multi-dot '{m_multi_dot.group(0)}' -> '{merged}'", "DEBUG")
+            except ValueError:
+                pass
         box = item.get("box")
         names = find_stat_names(line_text)
         values = []
@@ -717,6 +868,7 @@ def parse_relic(lines: list[dict]) -> Relic:
             line_groups.append({
                 "y": box_mid_y(box) if box else 0,
                 "x": box_x(box) if box else 0,
+                "box": box,
                 "names": names,
                 "values": values,
                 "text": line_text,
@@ -724,33 +876,37 @@ def parse_relic(lines: list[dict]) -> Relic:
     line_groups.sort(key=lambda g: (g["y"], g["x"]))
     log_to_file(f"parse_relic: line_groups={line_groups}", "DEBUG")
 
-    pending_names: list[tuple[str, float]] = []
-    pending_values: list[tuple[float, bool, float]] = []
-    pairs: list[tuple[str, float, bool]] = []
+    # 每个 pending 项额外带 box，便于后续对齐位置
+    pending_names: list[tuple[str, float, list | None]] = []
+    pending_values: list[tuple[float, bool, float, list | None]] = []
+    pairs: list[tuple[str, float, bool, list | None]] = []
 
     for group in line_groups:
         line_y = group["y"]
+        line_box = group.get("box")
 
         for name in group["names"]:
             found = False
-            for i, (val, hpct, vy) in enumerate(pending_values):
+            for i, (val, hpct, vy, _vbox) in enumerate(pending_values):
                 if abs(line_y - vy) > 40:
                     continue
                 if is_value_compatible(name, val, hpct):
-                    pairs.append((name, val, hpct))
+                    # name 与 value 跨行时，优先用 name 所在行的 box（更稳定）
+                    pairs.append((name, val, hpct, line_box))
                     del pending_values[i]
                     found = True
                     break
             if not found:
-                pending_names.append((name, line_y))
+                pending_names.append((name, line_y, line_box))
 
         for val, hpct in group["values"]:
             found = False
-            for i, (name, ny) in enumerate(pending_names):
+            for i, (name, ny, _nbox) in enumerate(pending_names):
                 if abs(line_y - ny) > 40:
                     continue
                 if is_value_compatible(name, val, hpct):
-                    pairs.append((name, val, hpct))
+                    # 跨行配对时用 name 所在行的 box
+                    pairs.append((name, val, hpct, _nbox))
                     del pending_names[i]
                     found = True
                     break
@@ -758,14 +914,14 @@ def parse_relic(lines: list[dict]) -> Relic:
                 if not hpct and val <= 30 and len(group["names"]) == 0 and "＋" in group["text"]:
                     log_to_file(f"parse_relic: filtered noise value={val} (line={group['text']})", "DEBUG")
                     continue
-                pending_values.append((val, hpct, line_y))
+                pending_values.append((val, hpct, line_y, line_box))
 
     log_to_file(f"parse_relic: before cross-line - pending_names={pending_names}, pending_values={pending_values}", "DEBUG")
 
-    for name, ny in pending_names:
-        for i, (val, hpct, vy) in enumerate(pending_values):
+    for name, ny, nbox in pending_names:
+        for i, (val, hpct, vy, _vbox) in enumerate(pending_values):
             if abs(ny - vy) <= 50 and is_value_compatible(name, val, hpct):
-                pairs.append((name, val, hpct))
+                pairs.append((name, val, hpct, nbox))
                 del pending_values[i]
                 break
 
@@ -773,11 +929,11 @@ def parse_relic(lines: list[dict]) -> Relic:
 
     seen_names = set()
     unique_pairs = []
-    for name, val, hpct in pairs:
+    for name, val, hpct, box in pairs:
         key = (name, hpct, round(val, 2))
         if key not in seen_names:
             seen_names.add(key)
-            unique_pairs.append((name, val, hpct))
+            unique_pairs.append((name, val, hpct, box))
         else:
             log_to_file(f"parse_relic: deduplicated {name}={val}%={hpct}", "DEBUG")
 
@@ -787,19 +943,20 @@ def parse_relic(lines: list[dict]) -> Relic:
     main_value = 0.0
     subs: list[StatLine] = []
     if unique_pairs:
-        first_name, first_value, first_pct = unique_pairs[0]
+        first_name, first_value, first_pct, first_box = unique_pairs[0]
         main_name = normalize_stat_name(first_name, first_pct)
         main_value = first_value
-        for name, value, has_pct in unique_pairs[1:]:
+        main_box = first_box
+        for name, value, has_pct, box in unique_pairs[1:]:
             stat_name = normalize_stat_name(name, has_pct)
-            subs.append(StatLine(stat_name, value, has_pct, None))
+            subs.append(StatLine(stat_name, value, has_pct, box))
 
     if main_name is None:
         for name in find_stat_names(compact):
             main_name = name
             break
     log_to_file(f"parse_relic: result - main={main_name}:{main_value}, subs={[(s.name, s.value, s.percent) for s in subs]}", "DEBUG")
-    return Relic(slot=slot, main_name=main_name, main_value=main_value, subs=subs[:4], raw_text=text)
+    return Relic(slot=slot, main_name=main_name, main_value=main_value, main_box=main_box, subs=subs[:4], raw_text=text)
 
 
 def is_value_compatible(raw_name: str, value: float, has_percent: bool) -> bool:
@@ -1151,6 +1308,7 @@ def score_relic_lines(base: CharacterStats, relics: dict[str, Relic], buffs: dic
     with_crit_100 = expected_damage_crit_100(totals_with, config)
     for idx, stat in enumerate(relic.subs):
         weight = _stat_weight(stat.name, config)
+        stat.weight = weight
         if weight <= 0:
             stat.score = 0.0
             stat.theoretical_score = 0.0
@@ -1228,23 +1386,69 @@ class Overlay(tk.Toplevel):
         self.attributes("-topmost", True)
         self.attributes("-alpha", 0.92)
         self.configure(bg="#101820")
-        self.line1_label = tk.Label(self, text="等待记录", bg="#101820", fg="#ffffff", font=("Microsoft YaHei UI", 14, "bold"))
+        s = self._scale()
+        self.line1_label = tk.Label(self, text="等待记录", bg="#101820", fg="#ffffff",
+                                    font=scaled_font(14, s, bold=True))
         self.line1_label.pack(ipadx=18, ipady=3)
-        self.line2_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0", font=("Microsoft YaHei UI", 10))
+        self.line2_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0",
+                                    font=scaled_font(10, s))
         self.line2_label.pack(ipadx=18, ipady=1)
-        self.line3_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0", font=("Microsoft YaHei UI", 10))
+        self.line3_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0",
+                                    font=scaled_font(10, s))
         self.line3_label.pack(ipadx=18, ipady=1)
-        self.line4_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0", font=("Microsoft YaHei UI", 10))
+        self.line4_label = tk.Label(self, text="", bg="#101820", fg="#a0a0a0",
+                                    font=scaled_font(10, s))
         self.line4_label.pack(ipadx=18, ipady=1)
         # 错误信息显示在最底部一行
         self.error_label = tk.Label(self, text="", bg="#101820", fg="#ff5b5b",
-                                     font=("Microsoft YaHei UI", 10, "bold"), wraplength=600, justify="center")
+                                    font=scaled_font(10, s, bold=True), wraplength=600, justify="center")
         self.error_label.pack(ipadx=18, ipady=1)
         self._error_clear_job = None
         self._center_top()
         set_window_clickthrough(self)
         self.stat_windows: list[tk.Toplevel] = []
         self.debug_windows: list[tk.Toplevel] = []
+
+    def _scale(self) -> float:
+        """读取当前 overlay 缩放系数（从 App 的 overlay_scale 变量）"""
+        try:
+            return float(self.master.overlay_scale.get())
+        except Exception:
+            return 1.0
+
+    def apply_scale(self):
+        """滑条改变时调用：更新主 overlay 4行文字+错误标签的字体。"""
+        s = self._scale()
+        self.line1_label.configure(font=scaled_font(14, s, bold=True))
+        self.line2_label.configure(font=scaled_font(10, s))
+        self.line3_label.configure(font=scaled_font(10, s))
+        self.line4_label.configure(font=scaled_font(10, s))
+        self.error_label.configure(font=scaled_font(10, s, bold=True))
+        self._center_top()
+
+    def _text_window(self, x: int, center_y: int, text: str, bg: str, fg: str,
+                     font_spec: tuple, alpha: float, window_list: list) -> tk.Toplevel:
+        """创建 overlay 文本窗口，使窗口垂直中心精确对齐 center_y。
+        关键：用 label.winfo_reqwidth/reqheight（label 自身请求尺寸，不含 Toplevel 边距）
+        显式设置窗口 w×h，确保窗口紧凑包裹文字，不会因 Toplevel 默认尺寸导致相邻色块重叠。"""
+        win = tk.Toplevel(self)
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+        win.attributes("-alpha", alpha)
+        win.configure(bg=bg)
+        win.withdraw()
+        label = tk.Label(win, text=text, anchor="w", bg=bg, fg=fg, font=font_spec,
+                         padx=6, pady=2)
+        label.pack()
+        win.update_idletasks()
+        label_w = label.winfo_reqwidth()
+        label_h = label.winfo_reqheight()
+        correct_y = max(0, int(center_y - label_h / 2))
+        win.geometry(f"{label_w}x{label_h}+{x}+{correct_y}")
+        win.deiconify()
+        set_window_clickthrough(win)
+        window_list.append(win)
+        return win
 
     def _center_top(self):
         self.update_idletasks()
@@ -1293,31 +1497,51 @@ class Overlay(tk.Toplevel):
         self._clear_windows(self.stat_windows)
         x, y, _, _ = region
         sx = max(0, x - 180)
+        # 词条名位置（与调试模式词条名同列，但无视调试开关）
+        nx = max(0, x - 380)
         if relic.subs and relic.subs[0].box:
-            first_sub_y = int(y + box_mid_y(relic.subs[0].box))
+            first_sub_center = int(y + box_mid_y(relic.subs[0].box))
         else:
-            first_sub_y = y + 150
-        # 总分位置上移，留出空间放理论总分，避免重叠
-        total_y = max(0, first_sub_y - 80)
+            first_sub_center = y + 170
+        # 总分中线在第一条副词条中线上方 120px
+        total_center = max(0, first_sub_center - 120)
         if relic.total_score > 0 or relic.total_delta != 0:
+            # "遗器总分：" 标签（白字，无视调试模式），左边与调试词条名同列对齐，与总分同中线
+            self._static_label_window(nx, total_center, "遗器总分：")
             # 总分字体放大
-            self._score_window(sx, total_y, format_score_delta(relic.total_score, relic.total_delta), relic.total_delta, font_size=18)
+            self._score_window(sx, total_center, format_score_delta(relic.total_score, relic.total_delta),
+                               relic.total_delta, font_size=18)
             # 理论总分另起一行（格式化后与实际分相同时隐藏）
             if relic.theoretical_total > 0 and round(relic.theoretical_total, 1) != round(relic.total_score, 1):
-                self._score_window(sx, total_y + 48, f"({relic.theoretical_total:.1f})", 0.0, font_size=14)
+                self._score_window(sx, total_center + 48, f"({relic.theoretical_total:.1f})", 0.0, font_size=14)
         for idx, stat in enumerate(relic.subs):
             if stat.box:
-                sy = int(y + box_mid_y(stat.box) - 12)
+                stat_center = int(y + box_mid_y(stat.box))
             else:
-                sy = y + 160 + idx * 42
-            if stat.score > 0 or stat.delta != 0:
+                stat_center = y + 170 + idx * 42
+            if stat.weight > 0 or stat.delta != 0:
                 stat_text = format_score_delta(stat.score, stat.delta)
                 # 副词条理论值用括号显示在同一行（格式化后与实际分相同时隐藏）
                 width = 8
                 if stat.theoretical_score > 0 and round(stat.theoretical_score, 1) != round(stat.score, 1):
                     stat_text += f" ({stat.theoretical_score:.1f})"
                     width = 12
-                self._score_window(sx, sy, stat_text, stat.delta, width=width)
+                self._score_window(sx, stat_center, stat_text, stat.delta, width=width)
+        # 已删除词条：词条名（红字，无视调试模式）+ 差值（红字 -score），接在最后一条副词条下方
+        if relic.removed_stats:
+            if relic.subs and relic.subs[-1].box:
+                last_center = int(y + box_mid_y(relic.subs[-1].box))
+            elif relic.subs:
+                last_center = y + 170 + (len(relic.subs) - 1) * 42
+            else:
+                last_center = y + 170
+            start_center = last_center + 42
+            for i, (name, score) in enumerate(relic.removed_stats):
+                line_center = start_center + i * 42
+                # 词条名和差值共享同一个中线，_text_window 按各自字号自动居中
+                self._removed_name_window(nx, line_center, name)
+                delta_text = f"{abs(score):.0f}" if abs(score) >= 10 else f"{abs(score):.1f}"
+                self._score_window(sx, line_center, f"-{delta_text}", -score)
 
     def set_debug_overlay(self, region: tuple[int, int, int, int] | None, relic: Relic | None, stats: CharacterStats | None = None):
         """调试模式：在分数窗口更左侧显示 OCR 解析出的词条名:词条值"""
@@ -1325,65 +1549,88 @@ class Overlay(tk.Toplevel):
         if stats:
             x, y = 520, 100
             dx = x - 380
-            self._debug_window(dx, y, f"基础值识别结果:")
-            self._debug_window(dx, y + 24, f"生命值: {stats.hp_base:.0f} +{stats.hp_bonus:.0f}")
-            self._debug_window(dx, y + 48, f"攻击力: {stats.atk_base:.0f} +{stats.atk_bonus:.0f}")
-            self._debug_window(dx, y + 72, f"防御力: {stats.def_base:.0f} +{stats.def_bonus:.0f}")
-            self._debug_window(dx, y + 96, f"速度: {stats.speed:.0f}")
-            self._debug_window(dx, y + 120, f"暴击率: {stats.crit_rate*100:.1f}%")
-            self._debug_window(dx, y + 144, f"暴击伤害: {stats.crit_dmg*100:.1f}%")
+            # 基础值面板以 center_y 定位，每行中线间隔 24px
+            self._debug_window(dx, y + 12, f"基础值识别结果:")
+            self._debug_window(dx, y + 36, f"生命值: {stats.hp_base:.0f} +{stats.hp_bonus:.0f}")
+            self._debug_window(dx, y + 60, f"攻击力: {stats.atk_base:.0f} +{stats.atk_bonus:.0f}")
+            self._debug_window(dx, y + 84, f"防御力: {stats.def_base:.0f} +{stats.def_bonus:.0f}")
+            self._debug_window(dx, y + 108, f"速度: {stats.speed:.0f}")
+            self._debug_window(dx, y + 132, f"暴击率: {stats.crit_rate*100:.1f}%")
+            self._debug_window(dx, y + 156, f"暴击伤害: {stats.crit_dmg*100:.1f}%")
             return
         if not region or not relic:
             return
         x, y, _, _ = region
         dx = max(0, x - 380)
-        main_y = max(0, y + 12)
+        # 主词条中线对齐 OCR box 中线
+        if relic.main_box:
+            main_center = int(y + box_mid_y(relic.main_box))
+        else:
+            main_center = max(0, y + 20)
         main_text = f"{relic.main_name or '?'}: {relic.main_value:g}"
-        self._debug_window(dx, main_y, main_text)
-        last_y = main_y
+        self._debug_window(dx, main_center, main_text)
         for idx, stat in enumerate(relic.subs):
             if stat.box:
-                sy = int(y + box_mid_y(stat.box) - 12)
+                stat_center = int(y + box_mid_y(stat.box))
             else:
-                sy = y + 160 + idx * 42
+                stat_center = y + 170 + idx * 42
             unit = "%" if stat.percent else ""
-            self._debug_window(dx, sy, f"{stat.name}: {stat.value:g}{unit}")
-            last_y = sy
-        # 在最后一行后面显示被删除的有效词条
-        if relic.removed_stats:
-            removed_y = last_y + 28
-            self._debug_window(dx, removed_y, "已删除词条:")
-            for i, (name, score) in enumerate(relic.removed_stats):
-                self._debug_window(dx, removed_y + (i + 1) * 22, f"-{name}: 分数 {score:.1f}")
+            self._debug_window(dx, stat_center, f"{stat.name}: {stat.value:g}{unit}")
+
+    def _removed_name_window(self, x: int, center_y: int, name: str):
+        self._text_window(x, center_y, name, "#101820", "#ff5b5b",
+                          scaled_font(12, self._scale(), bold=True), 0.9, self.stat_windows)
+
+    def _static_label_window(self, x: int, center_y: int, text: str, font_size: int = 18):
+        """固定文本标签（白字），无视调试模式，与总分同字号对齐。"""
+        self._text_window(x, center_y, text, "#101820", "#ffffff",
+                          scaled_font(font_size, self._scale(), bold=True), 0.9, self.stat_windows)
 
     def clear_debug(self):
         self._clear_windows(self.debug_windows)
 
-    def _score_window(self, x: int, y: int, text: str, delta: float, width: int = 8, font_size: int = 14):
-        win = tk.Toplevel(self)
-        win.overrideredirect(True)
-        win.attributes("-topmost", True)
-        win.attributes("-alpha", 0.9)
-        win.configure(bg="#101820")
+    def _score_window(self, x: int, center_y: int, text: str, delta: float,
+                      width: int = 8, font_size: int = 14):
         color = "#65f2a5" if delta >= 0 else "#ff5b5b"
-        # 不设置固定 width，让 Label 按实际文本宽度自适应，左对齐
-        label = tk.Label(win, text=text, anchor="w", bg="#101820", fg=color, font=("Microsoft YaHei UI", font_size, "bold"))
-        label.pack(ipadx=6, ipady=2)
-        win.geometry(f"+{x}+{y}")
-        set_window_clickthrough(win)
-        self.stat_windows.append(win)
+        self._text_window(x, center_y, text, "#101820", color,
+                          scaled_font(font_size, self._scale(), bold=True), 0.9, self.stat_windows)
 
-    def _debug_window(self, x: int, y: int, text: str):
-        win = tk.Toplevel(self)
-        win.overrideredirect(True)
-        win.attributes("-topmost", True)
-        win.attributes("-alpha", 0.85)
-        win.configure(bg="#1a1a2e")
-        label = tk.Label(win, text=text, anchor="w", bg="#1a1a2e", fg="#ffcc66", font=("Microsoft YaHei UI", 12))
-        label.pack(ipadx=6, ipady=2)
-        win.geometry(f"+{x}+{y}")
-        set_window_clickthrough(win)
-        self.debug_windows.append(win)
+    def _debug_window(self, x: int, center_y: int, text: str):
+        self._text_window(x, center_y, text, "#1a1a2e", "#ffcc66",
+                          scaled_font(12, self._scale()), 0.85, self.debug_windows)
+
+
+class CollapsibleFrame(ttk.Frame):
+    """可折叠面板：点击标题栏展开/收起内容。"""
+    def __init__(self, master, title: str = "", start_expanded: bool = True, **kwargs):
+        super().__init__(master, **kwargs)
+        self._expanded = start_expanded
+        self._title_var = tk.StringVar(value=("▼ " if start_expanded else "▶ ") + title)
+        self._toggle_btn = ttk.Button(self, textvariable=self._title_var, style="Toggle.TButton",
+                                       command=self._toggle)
+        self._toggle_btn.pack(fill="x")
+        self._content_frame = ttk.Frame(self)
+        if start_expanded:
+            self._content_frame.pack(fill="x", padx=2, pady=(2, 0))
+
+    @property
+    def content(self) -> ttk.Frame:
+        return self._content_frame
+
+    def _toggle(self):
+        if self._expanded:
+            self._content_frame.pack_forget()
+            self._expanded = False
+        else:
+            self._content_frame.pack(fill="x", padx=2, pady=(2, 0))
+            self._expanded = True
+        title = self._title_var.get()
+        prefix = "▼ " if self._expanded else "▶ "
+        self._title_var.set(prefix + title[2:])
+
+    def set_title(self, title: str):
+        prefix = "▼ " if self._expanded else "▶ "
+        self._title_var.set(prefix + title)
 
 
 class App(tk.Tk):
@@ -1393,9 +1640,10 @@ class App(tk.Tk):
             messagebox.showerror("缺少依赖", f"{IMPORT_ERROR}\n\n请在项目目录运行：pip install -r requirements.txt")
             raise SystemExit(1)
         self.title("崩铁遗器实时计分")
-        self.geometry("820x920")
-        self.minsize(720, 700)
+        self.geometry("700x780")
+        self.minsize(600, 600)
         self.resizable(True, True)
+        self._setup_style()
         self.ocr = UmiOcrClient()
         # 角色配置：按角色名保存一份完整配置
         self.character_configs: dict[str, CharacterConfig] = {}
@@ -1410,7 +1658,10 @@ class App(tk.Tk):
         self.current_relic_region = (0, 0, 560, 390)
         self.ally_buff_vars = {field: tk.StringVar(value="0") for field in BUFF_FIELDS}
         self.self_buff_vars = {field: tk.StringVar(value="0") for field in BUFF_FIELDS}
-        self.debug_mode = tk.BooleanVar(value=False)
+        self.debug_mode = tk.BooleanVar(value=True)
+        # overlay 字体缩放系数（1.0 = 100%）。独立于 Windows DPI 缩放，
+        # 用于适配 2K/150% 等高分辨率环境，让 overlay 字体在游戏画面上比例合适。
+        self.overlay_scale = tk.DoubleVar(value=1.0)
         # 角色配置相关的 UI 变量
         self.character_name_var = tk.StringVar(value="姬子")
         self.valid_sub_vars: dict[str, tk.BooleanVar] = {name: tk.BooleanVar(value=False) for name in ALL_SUB_STATS}
@@ -1429,128 +1680,230 @@ class App(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self._start_keyboard_listener()
 
-    def _build_ui(self):
-        main = ttk.Frame(self, padding=12)
-        main.pack(fill="both", expand=True)
+    def _setup_style(self):
+        style = ttk.Style(self)
+        # 使用系统默认主题（Windows 上为 vista/xpnative，呈现 Win11 原生外观）
+        style.configure("TLabelframe", padding=6)
+        style.configure("TLabelframe.Label", font=("Microsoft YaHei UI", 9, "bold"))
+        style.configure("TButton", padding=4)
+        style.configure("TCheckbutton", padding=1)
+        style.configure("TRadiobutton", padding=1)
+        style.configure("TEntry", padding=2)
+        style.configure("Toggle.TButton", anchor="w", padding=(6, 4),
+                         font=("Microsoft YaHei UI", 9, "bold"))
 
-        # ===== 角色选择区 =====
-        char_frame = ttk.LabelFrame(main, text="角色配置")
-        char_frame.pack(fill="x")
-        ttk.Label(char_frame, text="当前角色：").grid(row=0, column=0, sticky="w", padx=4, pady=6)
-        self.character_combo = ttk.Combobox(char_frame, textvariable=self.character_name_var, width=14, state="readonly")
+    def _build_ui(self):
+        main = ttk.Frame(self, padding=6)
+        main.pack(fill="both", expand=True)
+        main.columnconfigure(0, weight=1)
+        main.rowconfigure(0, weight=1)
+
+        notebook = ttk.Notebook(main)
+        notebook.pack(fill="both", expand=True)
+
+        # ========== 第1页：主操作面板 ==========
+        page1 = ttk.Frame(notebook, padding=6)
+        page1.columnconfigure(0, weight=1)
+        page1.rowconfigure(2, weight=1)
+        notebook.add(page1, text="主面板")
+
+        # --- 角色配置 ---
+        char_frame = ttk.LabelFrame(page1, text="角色配置")
+        char_frame.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        char_frame.columnconfigure(1, weight=1)
+
+        # 角色选择行
+        ttk.Label(char_frame, text="当前角色：").grid(row=0, column=0, sticky="w", padx=4, pady=3)
+        self.character_combo = ttk.Combobox(char_frame, textvariable=self.character_name_var, width=12, state="readonly")
         self.character_combo.grid(row=0, column=1, sticky="w", padx=4)
         self.character_combo["values"] = list(self.character_configs.keys())
         self.character_combo.bind("<<ComboboxSelected>>", lambda e: self._on_character_switch())
-        ttk.Button(char_frame, text="新增角色", command=self._add_character).grid(row=0, column=2, padx=4)
-        ttk.Button(char_frame, text="删除当前", command=self._delete_character).grid(row=0, column=3, padx=4)
-        ttk.Button(char_frame, text="重命名", command=self._rename_character).grid(row=0, column=4, padx=4)
+        btn_row = ttk.Frame(char_frame)
+        btn_row.grid(row=0, column=2, sticky="e", padx=4)
+        ttk.Button(btn_row, text="新增", command=self._add_character, width=5).pack(side="left", padx=1)
+        ttk.Button(btn_row, text="删除", command=self._delete_character, width=5).pack(side="left", padx=1)
+        ttk.Button(btn_row, text="改名", command=self._rename_character, width=5).pack(side="left", padx=1)
 
         # 有效副词条
         subs_frame = ttk.Frame(char_frame)
-        subs_frame.grid(row=1, column=0, columnspan=5, sticky="w", padx=4, pady=4)
-        ttk.Label(subs_frame, text="有效副词条：").pack(side="left")
-        for name in ALL_SUB_STATS:
-            cb = ttk.Checkbutton(subs_frame, text=name, variable=self.valid_sub_vars[name],
-                                 command=self._on_valid_subs_change)
-            cb.pack(side="left", padx=2)
+        subs_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=4, pady=2)
+        ttk.Label(subs_frame, text="有效副词条：").pack(anchor="w")
+        sub_row1 = ttk.Frame(subs_frame); sub_row1.pack(fill="x")
+        sub_row2 = ttk.Frame(subs_frame); sub_row2.pack(fill="x")
+        for name in ["生命值", "生命值%", "攻击力", "攻击力%", "防御力", "防御力%", "速度"]:
+            ttk.Checkbutton(sub_row1, text=name, variable=self.valid_sub_vars[name],
+                            command=self._on_valid_subs_change).pack(side="left", padx=(0,6))
+        for name in ["暴击率", "暴击伤害", "击破特攻", "效果命中", "效果抵抗", "属性加伤"]:
+            ttk.Checkbutton(sub_row2, text=name, variable=self.valid_sub_vars[name],
+                            command=self._on_valid_subs_change).pack(side="left", padx=(0,6))
 
         # 伤害来源
         dmg_frame = ttk.Frame(char_frame)
-        dmg_frame.grid(row=2, column=0, columnspan=5, sticky="w", padx=4, pady=4)
+        dmg_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=4, pady=2)
         ttk.Label(dmg_frame, text="伤害来源：").pack(side="left")
-        dmg_combo = ttk.Combobox(dmg_frame, textvariable=self.damage_source_var, width=12, state="readonly",
+        dmg_combo = ttk.Combobox(dmg_frame, textvariable=self.damage_source_var, width=8, state="readonly",
                                   values=list(DAMAGE_SOURCES.keys()))
-        dmg_combo.pack(side="left", padx=4)
-        # 显示中文映射
-        self._dmg_source_label = ttk.Label(dmg_frame, text="攻击力", width=10)
+        dmg_combo.pack(side="left", padx=(2,4))
+        self._dmg_source_label = ttk.Label(dmg_frame, text="攻击力", width=6, anchor="w")
         self._dmg_source_label.pack(side="left")
         dmg_combo.bind("<<ComboboxSelected>>", lambda e: self._on_damage_source_change())
-        ttk.Label(dmg_frame, text="自定义公式：").pack(side="left", padx=(8, 0))
-        ttk.Entry(dmg_frame, textvariable=self.damage_formula_var, width=24).pack(side="left", padx=4)
-        ttk.Button(dmg_frame, text="应用", command=self._on_damage_formula_change).pack(side="left", padx=4)
+        ttk.Label(dmg_frame, text="公式：").pack(side="left", padx=(8,0))
+        ttk.Entry(dmg_frame, textvariable=self.damage_formula_var, width=16).pack(side="left", padx=2, fill="x", expand=True)
+        ttk.Button(dmg_frame, text="应用", command=self._on_damage_formula_change, width=5).pack(side="left", padx=(2,0))
 
-        # 转模公式列表
+        # 转模公式
         conv_frame = ttk.Frame(char_frame)
-        conv_frame.grid(row=3, column=0, columnspan=5, sticky="w", padx=4, pady=4)
-        ttk.Label(conv_frame, text="转模公式：").pack(side="left")
-        self.conv_listbox = tk.Listbox(conv_frame, height=3, width=50)
-        self.conv_listbox.pack(side="left", padx=4)
-        ttk.Button(conv_frame, text="添加", command=lambda: self._edit_conversion(None)).pack(side="left", padx=2)
-        ttk.Button(conv_frame, text="编辑", command=lambda: self._edit_conversion_from_selection()).pack(side="left", padx=2)
-        ttk.Button(conv_frame, text="删除", command=self._delete_conversion).pack(side="left", padx=2)
-        self._conv_preview_label = ttk.Label(char_frame, text="", foreground="#666666")
-        self._conv_preview_label.grid(row=4, column=0, columnspan=5, sticky="w", padx=4)
+        conv_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=4, pady=(4,2))
+        ttk.Label(conv_frame, text="转模公式：").pack(anchor="w")
+        self.conv_listbox = tk.Listbox(conv_frame, height=3, font=("Consolas", 9))
+        self.conv_listbox.pack(fill="x", pady=2)
+        conv_btn = ttk.Frame(conv_frame); conv_btn.pack(fill="x")
+        ttk.Button(conv_btn, text="添加", command=lambda: self._edit_conversion(None), width=5).pack(side="left", padx=(0,2))
+        ttk.Button(conv_btn, text="编辑", command=lambda: self._edit_conversion_from_selection(), width=5).pack(side="left", padx=2)
+        ttk.Button(conv_btn, text="删除", command=self._delete_conversion, width=5).pack(side="left", padx=2)
+        self._conv_preview_label = ttk.Label(conv_frame, text="", foreground="#666666", font=("Microsoft YaHei UI", 8))
+        self._conv_preview_label.pack(fill="x", pady=(2,0))
 
-        # ===== 拐力区 =====
-        ally_frame = ttk.LabelFrame(main, text="队友拐力（支持 100+200 格式）")
-        ally_frame.pack(fill="x", pady=(8, 0))
-        self._buff_grid(ally_frame, self.ally_buff_vars)
+        # --- 拐力区（左右并排，各自可折叠）---
+        buffs_row = ttk.Frame(page1)
+        buffs_row.grid(row=1, column=0, sticky="ew", pady=2)
+        buffs_row.columnconfigure(0, weight=1)
+        buffs_row.columnconfigure(1, weight=1)
 
-        self_frame = ttk.LabelFrame(main, text="自拐（角色自身提供的拐力，作用同队友拐力）")
-        self_frame.pack(fill="x", pady=(8, 0))
-        self._buff_grid(self_frame, self.self_buff_vars)
+        self._ally_collapse = CollapsibleFrame(buffs_row, "队友拐力（支持 100+200 格式）", start_expanded=True)
+        self._ally_collapse.grid(row=0, column=0, sticky="nsew", padx=(0,3))
+        ally_inner = self._ally_collapse.content
+        ally_inner.columnconfigure(1, weight=1)
+        self._buff_grid(ally_inner, self.ally_buff_vars, compact=True)
 
-        debug_frame = ttk.Frame(main)
-        debug_frame.pack(fill="x", pady=(8, 0))
-        ttk.Label(debug_frame, text="调试模式：").pack(side="left")
-        ttk.Radiobutton(debug_frame, text="关闭", variable=self.debug_mode, value=False,
-                        command=self._on_debug_toggle).pack(side="left", padx=4)
-        ttk.Radiobutton(debug_frame, text="开启", variable=self.debug_mode, value=True,
-                        command=self._on_debug_toggle).pack(side="left", padx=4)
-        ttk.Label(debug_frame, text="（开启后在分数 overlay 更左侧显示 OCR 解析结果：词条名:词条值）").pack(side="left", padx=8)
+        self._self_collapse = CollapsibleFrame(buffs_row, "自拐（角色自身提供的拐力）", start_expanded=True)
+        self._self_collapse.grid(row=0, column=1, sticky="nsew", padx=(3,0))
+        self_inner = self._self_collapse.content
+        self_inner.columnconfigure(1, weight=1)
+        self._buff_grid(self_inner, self.self_buff_vars, compact=True)
 
-        region_frame = ttk.LabelFrame(main, text='截图区域。格式："左上x,左上y | 右下x,右下y"')
-        region_frame.pack(fill="x", pady=10)
+        # 占据中间空间的弹性占位
+        spacer = ttk.Frame(page1)
+        spacer.grid(row=2, column=0, sticky="nsew")
+
+        # --- 操作按钮（底部，三个大按钮横排）---
+        action_frame = ttk.Frame(page1)
+        action_frame.grid(row=3, column=0, sticky="ew", pady=(4,2))
+        action_frame.columnconfigure(0, weight=1)
+        action_frame.columnconfigure(1, weight=1)
+        action_frame.columnconfigure(2, weight=1)
+        ttk.Button(action_frame, text="记录基础值 (1)", command=self.capture_base_async).grid(
+            row=0, column=0, sticky="ew", padx=2, ipady=6)
+        ttk.Button(action_frame, text="记录/替换遗器 (空格)", command=self.capture_relic_async).grid(
+            row=0, column=1, sticky="ew", padx=2, ipady=6)
+        ttk.Button(action_frame, text="撤回 (退格)", command=self.undo).grid(
+            row=0, column=2, sticky="ew", padx=2, ipady=6)
+
+        # 状态提示
+        admin_note = "非管理员；若游戏以管理员运行，热键可能无效。" if not is_admin() else ""
+        self.status = tk.StringVar(value=f"先填区域和拐力；按 1 记录基础值，按空格记录遗器。{admin_note}")
+        ttk.Label(page1, textvariable=self.status, wraplength=650, font=("Microsoft YaHei UI", 8),
+                  foreground="#555555").grid(row=4, column=0, sticky="ew", pady=(2,0))
+
+        # ========== 第2页：设置 & 预览 ==========
+        page2 = ttk.Frame(notebook, padding=6)
+        page2.columnconfigure(0, weight=1)
+        page2.rowconfigure(2, weight=1)
+        page2.rowconfigure(3, weight=1)
+        notebook.add(page2, text="设置 / 预览")
+
+        # 截图区域 & 调试
+        region_frame = ttk.LabelFrame(page2, text="截图区域")
+        region_frame.grid(row=0, column=0, sticky="ew", pady=(0,4))
+        region_frame.columnconfigure(1, weight=1)
         self.detail_region = tk.StringVar(value=DEFAULT_DETAIL_REGION)
         self.relic_region = tk.StringVar(value=DEFAULT_RELIC_REGION)
         self._region_row(region_frame, "脱装备详情", self.detail_region, 0)
         self._region_row(region_frame, "遗器详情", self.relic_region, 1)
+        dbg_row = ttk.Frame(region_frame)
+        dbg_row.grid(row=2, column=0, columnspan=3, sticky="w", padx=4, pady=(2,2))
+        ttk.Label(dbg_row, text="调试：").pack(side="left")
+        ttk.Radiobutton(dbg_row, text="关", variable=self.debug_mode, value=False,
+                        command=self._on_debug_toggle).pack(side="left", padx=2)
+        ttk.Radiobutton(dbg_row, text="开", variable=self.debug_mode, value=True,
+                        command=self._on_debug_toggle).pack(side="left", padx=2)
 
-        btns = ttk.Frame(main)
-        btns.pack(fill="x", pady=6)
-        ttk.Button(btns, text="测试 Umi-OCR", command=self.test_ocr).pack(side="left")
-        ttk.Button(btns, text="截图详情预览", command=lambda: self.preview_region_async(self.detail_region)).pack(side="left", padx=8)
-        ttk.Button(btns, text="截图遗器预览", command=lambda: self.preview_region_async(self.relic_region)).pack(side="left")
-        ttk.Button(btns, text="记录基础值 (1)", command=self.capture_base_async).pack(side="left", padx=8)
-        ttk.Button(btns, text="记录/替换遗器 (空格)", command=self.capture_relic_async).pack(side="left")
-        ttk.Button(btns, text="撤回 (退格)", command=self.undo).pack(side="left", padx=8)
-        if not is_admin():
-            ttk.Button(btns, text="以管理员重启", command=self.ask_relaunch_admin).pack(side="left")
+        # Overlay 字体缩放滑条（独立于 Windows DPI 缩放）
+        scale_row = ttk.Frame(region_frame)
+        scale_row.grid(row=3, column=0, columnspan=3, sticky="ew", padx=4, pady=(2,2))
+        ttk.Label(scale_row, text="Overlay缩放：").pack(side="left")
+        self.scale_label = ttk.Label(scale_row, text="100%", width=6)
+        self.scale_label.pack(side="left", padx=2)
+        self.scale_slider = ttk.Scale(scale_row, from_=0.5, to=2.0,
+                                      variable=self.overlay_scale, command=self._on_scale_change)
+        self.scale_slider.pack(side="left", fill="x", expand=True, padx=4)
+        # 初始化显示
+        self._update_scale_label()
 
-        admin_note = "当前不是管理员权限；若游戏以管理员运行，全局热键可能无效。"
-        self.status = tk.StringVar(value=f"先填区域和拐力；按 1 记录基础值，按空格记录遗器。{admin_note if not is_admin() else ''}")
-        ttk.Label(main, textvariable=self.status, wraplength=780).pack(fill="x", pady=6)
+        # 测试 & 预览按钮
+        test_btns = ttk.Frame(page2)
+        test_btns.grid(row=1, column=0, sticky="ew", pady=2)
+        ttk.Button(test_btns, text="测试 Umi-OCR", command=self.test_ocr, width=14).pack(side="left", padx=(0,3))
+        ttk.Button(test_btns, text="截图详情预览", command=lambda: self.preview_region_async(self.detail_region), width=14).pack(side="left", padx=3)
+        ttk.Button(test_btns, text="截图遗器预览", command=lambda: self.preview_region_async(self.relic_region), width=14).pack(side="left", padx=3)
 
-        preview_frame = ttk.LabelFrame(main, text="最近一次截图")
-        preview_frame.pack(fill="both", expand=True, pady=(0, 6))
+        # 截图预览
+        preview_frame = ttk.LabelFrame(page2, text="最近一次截图")
+        preview_frame.grid(row=2, column=0, sticky="nsew", pady=4)
+        preview_frame.columnconfigure(0, weight=1)
+        preview_frame.rowconfigure(0, weight=1)
         self.preview_label = ttk.Label(preview_frame, text="点击截图预览后显示", anchor="center")
-        self.preview_label.pack(fill="both", expand=True, padx=8, pady=4)
-        # 保存原始截图，窗口拉伸时按 label 实际尺寸重绘
+        self.preview_label.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
         self._preview_original_image: Image.Image | None = None
         self._preview_region_text: str = ""
         self.preview_label.bind("<Configure>", lambda e: self._redraw_preview())
 
-        self.text = tk.Text(main, height=8, font=("Consolas", 10))
-        self.text.pack(fill="both", expand=True)
-        self.log("热键：数字 1 = 记录基础值；空格 = 记录/替换当前遗器；退格 = 撤回上次替换。")
+        # 日志
+        log_frame = ttk.LabelFrame(page2, text="日志")
+        log_frame.grid(row=3, column=0, sticky="nsew")
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.text = tk.Text(log_frame, height=6, font=("Consolas", 9), relief="flat",
+                            bg="#f8f8f8", bd=0, highlightthickness=0)
+        self.text.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        self.log("热键：1=记录基础值；空格=记录/替换遗器；退格=撤回。")
 
-    def _buff_grid(self, parent, vars_dict: dict[str, tk.StringVar]):
-        # 3 列布局，每列 label + entry
-        for idx, field in enumerate(BUFF_FIELDS):
-            row = idx // 3
-            col = (idx % 3) * 2
-            ttk.Label(parent, text=BUFF_LABELS[field]).grid(row=row, column=col, sticky="w", padx=4, pady=4)
-            ttk.Entry(parent, textvariable=vars_dict[field], width=12).grid(row=row, column=col + 1, sticky="w", padx=4)
+    def _buff_grid(self, parent, vars_dict: dict[str, tk.StringVar], compact: bool = False):
+        """compact=True 时为纵向单列布局（左右分栏使用），否则为三列布局。"""
+        if compact:
+            for idx, field in enumerate(BUFF_FIELDS):
+                ttk.Label(parent, text=BUFF_LABELS[field]).grid(row=idx, column=0, sticky="w", padx=2, pady=1)
+                ttk.Entry(parent, textvariable=vars_dict[field]).grid(row=idx, column=1, sticky="ew", padx=(2,4), pady=1)
+        else:
+            for idx, field in enumerate(BUFF_FIELDS):
+                row = idx // 3
+                col = (idx % 3) * 2
+                ttk.Label(parent, text=BUFF_LABELS[field]).grid(row=row, column=col, sticky="w", padx=(2,2), pady=2)
+                ttk.Entry(parent, textvariable=vars_dict[field], width=10).grid(row=row, column=col + 1, sticky="ew", padx=(0,8), pady=2)
 
     def _on_debug_toggle(self):
         if not self.debug_mode.get():
             self.overlay.clear_debug()
         self.save_config()
 
+    def _update_scale_label(self):
+        """更新缩放百分比文本显示"""
+        pct = int(round(self.overlay_scale.get() * 100))
+        self.scale_label.configure(text=f"{pct}%")
+
+    def _on_scale_change(self, *_):
+        """滑条拖动时实时更新 overlay 字体并保存配置"""
+        self._update_scale_label()
+        # 实时更新主 overlay 的4行文字字体
+        self.overlay.apply_scale()
+        # stat_windows / debug_windows 是临时窗口，下次扫描时会按新缩放重新创建，
+        # 这里无需重建，避免拖动时频繁闪烁。
+        self.save_config()
+
     def _region_row(self, parent, label, var, row):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=8, pady=5)
-        ttk.Entry(parent, textvariable=var, width=28).grid(row=row, column=1, sticky="w", padx=8)
-        ttk.Button(parent, text="采样", command=lambda: self.begin_sampling(var)).grid(row=row, column=2, sticky="w", padx=8)
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=4, pady=2)
+        ttk.Entry(parent, textvariable=var).grid(row=row, column=1, sticky="ew", padx=4, pady=2)
+        ttk.Button(parent, text="采样", command=lambda: self.begin_sampling(var), width=5).grid(row=row, column=2, padx=4, pady=2)
 
     def bind_config_traces(self):
         for var in list(self.ally_buff_vars.values()) + list(self.self_buff_vars.values()):
@@ -1886,6 +2239,8 @@ class App(tk.Tk):
             self.detail_region.set(regions.get("detail", DEFAULT_DETAIL_REGION))
             self.relic_region.set(regions.get("relic", DEFAULT_RELIC_REGION))
             self.debug_mode.set(bool(data.get("debug_mode", False)))
+            # overlay 字体缩放系数
+            self.overlay_scale.set(float(data.get("overlay_scale", 1.0)))
 
             # 角色配置
             characters_data = data.get("characters", {})
@@ -1928,6 +2283,7 @@ class App(tk.Tk):
                     "relic": self.relic_region.get(),
                 },
                 "debug_mode": bool(self.debug_mode.get()),
+                "overlay_scale": float(self.overlay_scale.get()),
                 "current_character": self.current_character,
                 "characters": {name: cfg.to_dict() for name, cfg in self.character_configs.items()},
             }
@@ -2188,6 +2544,12 @@ class App(tk.Tk):
         image = self._filter_relic_image(image)
         self.after(0, lambda: self.show_preview(image, region))
         self.current_relic_region = region
+        # 首次扫描时通过绿色 #6EE0B6 检测强化标记位置，缓存后后续 OCR 屏蔽该区域
+        if not self.ocr.ignore_area:
+            marker_area = detect_enhance_marker_by_color(image)
+            if marker_area:
+                self.ocr.ignore_area = marker_area
+                log_to_file(f"capture_relic: detected enhance marker area={marker_area}", "DEBUG")
         lines = self.ocr.image_to_lines(image)
         # 对缺失数值的词条，重新 OCR 右侧数值区域
         lines = self._ocr_missing_values(image, lines)
@@ -2198,6 +2560,10 @@ class App(tk.Tk):
         old_relic = self.relics.get(relic.slot)
         if old_relic and self._is_same_relic(old_relic, relic):
             # OCR 数值在容差内，视为同一遗器，不更新评分，但仍刷新 overlay
+            # 同步新 OCR 的 box 到 old_relic（配置加载的 old_relic.box 是 None）
+            old_relic.main_box = relic.main_box
+            for old_stat, new_stat in zip(old_relic.subs, relic.subs):
+                old_stat.box = new_stat.box
             self.after(0, lambda: self.overlay.set_stat_scores(region, old_relic))
             if self.debug_mode.get():
                 self.after(0, lambda: self.overlay.set_debug_overlay(region, relic))
